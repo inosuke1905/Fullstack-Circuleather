@@ -18,6 +18,48 @@ if ($batchDetailId > 0) {
         $batchDetailLoadError = t('Materiaalgegevens konden niet worden geladen.', 'Material details could not be loaded.');
     }
 }
+$inventoryChangeHistory = [];
+if ($batchDetail !== null) {
+    try {
+        $targetUrl = '?page=' . $detailRoute . '&id=' . $batchDetailId;
+        $historyQuery = $mysqli->prepare(
+            "SELECT actor_name, created_at, details_json FROM notifications
+             WHERE recipient_user_id = ? AND type = 'inventory_activity'
+                AND event_action = 'updated' AND target_url = ? AND details_json IS NOT NULL
+             ORDER BY id DESC LIMIT 10"
+        );
+        $currentUserId = (int) $_SESSION['user_id'];
+        $historyQuery->bind_param('is', $currentUserId, $targetUrl);
+        $historyQuery->execute();
+        foreach ($historyQuery->get_result()->fetch_all(MYSQLI_ASSOC) as $entry) {
+            $changes = json_decode($entry['details_json'], true);
+            if (is_array($changes) && $changes !== []) {
+                $entry['changes'] = $changes;
+                $inventoryChangeHistory[] = $entry;
+            }
+        }
+    } catch (Throwable $exception) {
+        error_log('Could not load inventory change history: ' . $exception->getMessage());
+    }
+}
+$inventoryChangeLabels = [
+    'sku' => 'SKU',
+    'material_name' => t('Materiaalnaam', 'Material name'),
+    'grade' => 'Grade',
+    'color' => t('Kleur', 'Color'),
+    'thickness' => t('Dikte', 'Thickness'),
+    'sale_price' => t('Verkoopprijs', 'Sale price'),
+    'cost_price' => t('Inkoopprijs', 'Cost price'),
+    'unit' => t('Eenheid', 'Unit'),
+    'stock' => t('Voorraad', 'Stock'),
+    'minimum_stock' => t('Minimale voorraad', 'Minimum stock'),
+    'origin' => t('Herkomst', 'Origin'),
+    'supplier' => t('Leverancier', 'Supplier'),
+    'arrival_date' => t('Datum', 'Date'),
+];
+$formatChangeValue = static fn ($value): string => $value === null || $value === ''
+    ? t('Leeg', 'Empty')
+    : escape(is_scalar($value) ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE));
 ?>
 <section class="page-section batch-details-page" aria-labelledby="batch-details-title">
     <div class="page-heading">
@@ -47,6 +89,22 @@ if ($batchDetailId > 0) {
             <a class="button button-secondary" href="?page=inventory&amp;view=<?= $detailInventoryView ?>"><?= t('Terug naar inventaris', 'Back to inventory') ?></a>
         </section>
     <?php else: ?>
+        <?php $shareResourceType = $isPieceDetail ? 'piece' : 'batch'; $shareResourceId = (int) $batchDetail['id']; require __DIR__ . '/share-controls.php'; ?>
+        <?php if ($inventoryChangeHistory !== []): ?>
+            <section class="change-history" aria-labelledby="inventory-history-title">
+                <h2 id="inventory-history-title"><?= t('Wat is gewijzigd', 'What changed') ?></h2>
+                <?php foreach ($inventoryChangeHistory as $entry): ?>
+                    <article class="change-history-entry">
+                        <p class="change-history-meta"><strong><?= escape($entry['actor_name']) ?></strong><time datetime="<?= escape(date(DATE_ATOM, strtotime($entry['created_at']))) ?>"><?= escape(date('d M Y, H:i', strtotime($entry['created_at']))) ?></time></p>
+                        <dl>
+                            <?php foreach ($entry['changes'] as $field => $change): ?>
+                                <div><dt><?= $inventoryChangeLabels[$field] ?? escape((string) $field) ?></dt><dd><span class="change-before"><?= $formatChangeValue($change['before'] ?? null) ?></span><span class="change-arrow" aria-hidden="true">&rarr;</span><span class="change-after"><?= $formatChangeValue($change['after'] ?? null) ?></span></dd></div>
+                            <?php endforeach; ?>
+                        </dl>
+                    </article>
+                <?php endforeach; ?>
+            </section>
+        <?php endif; ?>
         <form class="batch-edit-form" action="?page=<?= $detailRoute ?>&amp;id=<?= (int) $batchDetail['id'] ?>" method="post" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= escape($_SESSION['csrf_token']) ?>">
             <input type="hidden" name="action" value="update">

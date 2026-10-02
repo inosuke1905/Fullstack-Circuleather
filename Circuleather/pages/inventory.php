@@ -46,7 +46,7 @@ try {
     $searchPattern = '%' . $searchQuery . '%';
     $batchQuery = $mysqli->prepare(
         "SELECT id, sku, material_name, grade, color, thickness, stock, minimum_stock,
-            sale_price, unit, supplier, origin
+            sale_price, unit, supplier, origin, created_by_name
          FROM {$inventoryTable}
          WHERE (material_name LIKE ? OR sku LIKE ? OR color LIKE ? OR supplier LIKE ? OR origin LIKE ?)
             AND unit = ?
@@ -159,6 +159,7 @@ $viewUrl = static fn (string $view): string => '?' . http_build_query([
             <tr>
                 <th scope="col">SKU</th>
                 <th scope="col"><?= t('Materiaal', 'Material') ?></th>
+                <th scope="col"><?= t('Aangemaakt door', 'Created by') ?></th>
                 <th scope="col">Grade</th>
                 <th scope="col"><?= t('Kleur', 'Color') ?></th>
                 <th scope="col"><?= t('Dikte', 'Thickness') ?></th>
@@ -173,7 +174,7 @@ $viewUrl = static fn (string $view): string => '?' . http_build_query([
         <tbody>
             <?php if ($inventoryBatches === []): ?>
                 <tr>
-                    <td colspan="11">
+                    <td colspan="12">
                         <?php if ($inventoryError !== null): ?>
                             <?= t('De voorraad kon niet worden geladen.', 'Inventory could not be loaded.') ?>
                         <?php elseif ($searchQuery !== '' || $gradeFilter !== 'all' || $stockFilter !== 'all'): ?>
@@ -198,6 +199,7 @@ $viewUrl = static fn (string $view): string => '?' . http_build_query([
                     <tr>
                         <td><?= escape($batch['sku'] ?? '—') ?></td>
                         <td><?= escape($batch['material_name']) ?></td>
+                        <td><?= !empty($batch['created_by_name']) ? escape($batch['created_by_name']) : t('Onbekend', 'Unknown') ?></td>
                         <td><?= escape($batch['grade']) ?></td>
                         <td><?= escape($batch['color'] ?? '—') ?></td>
                         <td><?= escape($batch['thickness'] ?? '—') ?></td>

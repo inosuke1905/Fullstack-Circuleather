@@ -31,12 +31,50 @@ try {
     error_log('Order details failed: ' . $exception->getMessage());
     $orderLoadError = t('De ordergegevens konden niet worden geladen.', 'Order details could not be loaded.');
 }
+$orderChangeHistory = [];
+if ($orderState !== null && isset($mysqli)) {
+    try {
+        $targetUrl = '?page=order-detail&id=' . $orderDetailId;
+        $historyQuery = $mysqli->prepare(
+            "SELECT actor_name, created_at, details_json FROM notifications
+             WHERE recipient_user_id = ? AND type = 'order_activity'
+                AND event_action = 'updated' AND target_url = ? AND details_json IS NOT NULL
+             ORDER BY id DESC LIMIT 10"
+        );
+        $currentUserId = (int) $_SESSION['user_id'];
+        $historyQuery->bind_param('is', $currentUserId, $targetUrl);
+        $historyQuery->execute();
+        foreach ($historyQuery->get_result()->fetch_all(MYSQLI_ASSOC) as $entry) {
+            $changes = json_decode($entry['details_json'], true);
+            if (is_array($changes) && $changes !== []) {
+                $entry['changes'] = $changes;
+                $orderChangeHistory[] = $entry;
+            }
+        }
+    } catch (Throwable $exception) {
+        error_log('Could not load order change history: ' . $exception->getMessage());
+    }
+}
 $usePosted = $orderEditError !== null && !$orderEditConflict && ($_POST['action'] ?? '') !== 'delete';
 $formValue = static function (string $key) use ($orderState, $usePosted): string {
     $value = $usePosted ? ($_POST[$key] ?? '') : ($orderState['order'][$key] ?? '');
     return is_string($value) ? $value : '';
 };
 $formatOrderMoney = static fn ($value): string => number_format((float) $value, 2, ',', '.');
+$orderChangeLabels = [
+    'client_name' => t('Klantnaam', 'Customer name'),
+    'email' => t('E-mailadres', 'Email address'),
+    'phone' => t('Telefoonnummer', 'Phone number'),
+    'street_address' => t('Adres', 'Street address'),
+    'postal_code' => t('Postcode', 'Postal code'),
+    'city' => t('Plaats', 'City'),
+    'status' => t('Orderstatus', 'Order status'),
+    'payment_status' => t('Betaalstatus', 'Payment status'),
+    'order_items' => t('Orderregels', 'Order items'),
+];
+$formatChangeValue = static fn ($value): string => $value === null || $value === ''
+    ? t('Leeg', 'Empty')
+    : escape(is_scalar($value) ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE));
 ?>
 <section class="page-section order-details-page" aria-labelledby="order-details-title">
     <div class="page-heading">
@@ -103,6 +141,22 @@ $formatOrderMoney = static fn ($value): string => number_format((float) $value, 
         $revision = $usePosted && is_string($_POST['revision'] ?? null) ? $_POST['revision'] : orderEditRevision($orderState);
         ?>
         <?php if (isset($_GET['saved']) && $orderEditError === null): ?><p class="settings-saved" role="status"><?= t('Orderwijzigingen opgeslagen en voorraad bijgewerkt.', 'Order changes saved and inventory updated.') ?></p><?php elseif (isset($_GET['created']) && $orderEditError === null): ?><p class="settings-saved" role="status"><?= t('Order aangemaakt en voorraad bijgewerkt.', 'Order created and inventory updated.') ?></p><?php endif; ?>
+        <?php $shareResourceType = 'order'; $shareResourceId = (int) $orderState['order']['id']; require __DIR__ . '/share-controls.php'; ?>
+        <?php if ($orderChangeHistory !== []): ?>
+            <section class="change-history" aria-labelledby="order-history-title">
+                <h2 id="order-history-title"><?= t('Wat is gewijzigd', 'What changed') ?></h2>
+                <?php foreach ($orderChangeHistory as $entry): ?>
+                    <article class="change-history-entry">
+                        <p class="change-history-meta"><strong><?= escape($entry['actor_name']) ?></strong><time datetime="<?= escape(date(DATE_ATOM, strtotime($entry['created_at']))) ?>"><?= escape(date('d M Y, H:i', strtotime($entry['created_at']))) ?></time></p>
+                        <dl>
+                            <?php foreach ($entry['changes'] as $field => $change): ?>
+                                <div><dt><?= $orderChangeLabels[$field] ?? escape((string) $field) ?></dt><dd><span class="change-before"><?= $formatChangeValue($change['before'] ?? null) ?></span><span class="change-arrow" aria-hidden="true">&rarr;</span><span class="change-after"><?= $formatChangeValue($change['after'] ?? null) ?></span></dd></div>
+                            <?php endforeach; ?>
+                        </dl>
+                    </article>
+                <?php endforeach; ?>
+            </section>
+        <?php endif; ?>
         <form class="order-form" id="order-edit-form" action="?page=order-detail&amp;id=<?= (int) $orderState['order']['id'] ?>" method="post">
             <input type="hidden" name="csrf_token" value="<?= escape($_SESSION['csrf_token']) ?>">
             <input type="hidden" name="revision" value="<?= escape($revision) ?>">

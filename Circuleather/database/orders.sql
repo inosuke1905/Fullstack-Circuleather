@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS orders (
     status ENUM('open', 'processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'open',
     payment_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
     total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    created_by_user_id BIGINT UNSIGNED NULL,
+    created_by_name VARCHAR(120) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_orders_number (order_number),

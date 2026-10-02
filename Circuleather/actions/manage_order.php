@@ -12,8 +12,32 @@ if (!is_string($postedToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $pos
 
 try {
     require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../lib/notifications.php';
     require_once __DIR__ . '/../lib/order-editing.php';
-    $result = applyOrderAction($mysqli, $orderDetailId, $_POST);
+    $actorName = (string) ($_SESSION['full_name'] ?? 'System');
+    $findOrderNumber = $mysqli->prepare('SELECT order_number FROM orders WHERE id = ? LIMIT 1');
+    $findOrderNumber->bind_param('i', $orderDetailId);
+    $findOrderNumber->execute();
+    $orderNumber = (string) ($findOrderNumber->get_result()->fetch_assoc()['order_number'] ?? ('#' . $orderDetailId));
+    $stockChanged = static function (string $type, int $inventoryId, array $inventory, string $newStock) use ($mysqli, $actorName): void {
+        createLowStockNotifications(
+            $mysqli,
+            (string) $inventory['material_name'],
+            $type,
+            $inventoryId,
+            (float) $newStock,
+            (float) $inventory['minimum_stock'],
+            (string) $inventory['unit'],
+            $actorName
+        );
+    };
+    $orderChanged = static function (array $changes) use ($mysqli, $orderNumber, $orderDetailId, $actorName): void {
+        createOrderNotifications($mysqli, 'updated', $orderNumber, $orderDetailId, $actorName, $changes);
+    };
+    $result = applyOrderAction($mysqli, $orderDetailId, $_POST, $stockChanged, $orderChanged);
+    if ($result === 'deleted') {
+        createOrderNotifications($mysqli, 'deleted', $orderNumber, $orderDetailId, $actorName);
+    }
     header('Location: ' . ($result === 'deleted' ? '?page=orders&deleted=1' : '?page=order-detail&id=' . $orderDetailId . '&saved=1'));
     exit;
 } catch (DomainException $exception) {

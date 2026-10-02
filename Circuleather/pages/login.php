@@ -7,7 +7,7 @@ if (!defined('CIRCULEATHER_APP')) {
 <section class="auth-page" aria-labelledby="login-title">
     <p class="eyebrow"><?= t('Welkom terug', 'Welcome back') ?></p>
     <h1 id="login-title"><?= t('Inloggen', 'Log in') ?></h1>
-    <p class="auth-intro"><?= t('Log in om verder te gaan naar je voorraad.', 'Sign in to continue to your inventory.') ?></p>
+    <p class="auth-intro"><?= t('Log in om verder te gaan naar je voorraad. Accounts worden door de beheerder aangelegd.', 'Sign in to continue to your inventory. Accounts are created by the administrator.') ?></p>
 
     <?php if ($authError !== null): ?>
         <p class="form-error" role="alert"><?= $authError ?></p>
@@ -23,6 +23,4 @@ if (!defined('CIRCULEATHER_APP')) {
         <input id="login-password" name="password" type="password" autocomplete="current-password" required>
         <button class="button button-primary" type="submit"><?= t('Inloggen', 'Log in') ?></button>
     </form>
-
-    <p class="auth-switch"><?= t('Nog geen account?', 'New here?') ?> <a href="?page=register"><?= t('Account aanmaken', 'Create an account') ?></a></p>
 </section>

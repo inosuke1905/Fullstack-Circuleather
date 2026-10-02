@@ -65,7 +65,7 @@ foreach ($availableBatches as $availableBatch) {
         <input type="hidden" name="order_type" value="<?= escape($orderType) ?>">
 
         <fieldset class="order-form-section">
-            <legend><?= t('01 - Klantgegevens', '01 - Client details') ?></legend>
+            <legend><span class="order-step">01</span><?= t('Klantgegevens', 'Client details') ?></legend>
             <div class="order-client-grid">
                 <div>
                     <label for="client-name"><?= t('Naam', 'Name') ?> *</label>
@@ -95,7 +95,7 @@ foreach ($availableBatches as $availableBatch) {
         </fieldset>
 
         <fieldset class="order-form-section order-items-section">
-            <legend><?= t('02 - Materialen', '02 - Materials') ?></legend>
+            <legend><span class="order-step">02</span><?= t('Materialen', 'Materials') ?></legend>
             <p class="order-section-note"><?= $isPieceOrder ? t('Kies een stuk leer en vul het aantal hele stuks in. De prijs is per stuk.', 'Choose a leather piece and enter a whole number of pieces. Prices are per piece.') : t('Kies een batch en vul de bestelde hoeveelheid in kilogram in. De prijs is per kilogram.', 'Choose a batch and enter the quantity in kilograms. Prices are per kilogram.') ?></p>
             <div id="order-items" class="order-items-list">
                 <div class="order-item-row" data-order-item>

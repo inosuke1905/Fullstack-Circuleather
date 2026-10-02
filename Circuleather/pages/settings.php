@@ -50,7 +50,7 @@ if (!defined('CIRCULEATHER_APP')) {
                     <span class="settings-icon" aria-hidden="true">!</span>
                     <div>
                         <h2 id="notifications-title"><?= t('Meldingen', 'Notifications') ?></h2>
-                        <p><?= t('Kies welke voorraad- en ordermeldingen je wilt zien.', 'Choose which stock and order alerts to see.') ?></p>
+                        <p><?= t('Kies welke voorraad-, batch- en ordermeldingen je wilt zien. Beheerders krijgen ook accountmeldingen.', 'Choose which stock, batch, and order alerts to see. Admins also receive account alerts.') ?></p>
                     </div>
                 </div>
 
@@ -58,6 +58,10 @@ if (!defined('CIRCULEATHER_APP')) {
                     <label class="settings-toggle" for="low-stock-notifications">
                         <span><strong><?= t('Lage voorraad', 'Low stock') ?></strong><small><?= t('Melding wanneer een batch onder minimum komt.', 'Alert when a batch falls below its minimum.') ?></small></span>
                         <input id="low-stock-notifications" type="checkbox" name="low_stock_notifications" value="1"<?= $settings['low_stock_notifications'] ? ' checked' : '' ?>>
+                    </label>
+                    <label class="settings-toggle" for="inventory-notifications">
+                        <span><strong><?= t('Batchwijzigingen', 'Batch changes') ?></strong><small><?= t('Melding wanneer een batch of los stuk wordt toegevoegd, gewijzigd of verwijderd.', 'Alert when a batch or individual piece is created, changed, or deleted.') ?></small></span>
+                        <input id="inventory-notifications" type="checkbox" name="inventory_notifications" value="1"<?= $settings['inventory_notifications'] ? ' checked' : '' ?>>
                     </label>
                     <label class="settings-toggle" for="order-notifications">
                         <span><strong><?= t('Bestellingen', 'Orders') ?></strong><small><?= t('Melding bij een nieuwe of bijgewerkte bestelling.', 'Alert for new or updated orders.') ?></small></span>

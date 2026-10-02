@@ -125,18 +125,21 @@ try {
     $inspectionPhotoPath = $saveUpload('inspection_photo');
 
     require __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../lib/notifications.php';
     $mysqli->begin_transaction();
     $transactionOpen = true;
+    $createdByUserId = (int) ($_SESSION['user_id'] ?? 0);
+    $createdByName = (string) ($_SESSION['full_name'] ?? 'Unknown');
 
     $statement = $mysqli->prepare(
         "INSERT INTO {$storageTable} (
             sku, material_name, grade, color, thickness, sale_price, cost_price,
-            unit, stock, minimum_stock, origin, supplier, arrival_date,
+            unit, created_by_user_id, created_by_name, stock, minimum_stock, origin, supplier, arrival_date,
             batch_photo_path, inspection_photo_path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $statement->bind_param(
-        'sssssssssssssss',
+        'ssssssssissssssss',
         $sku,
         $materialName,
         $grade,
@@ -145,6 +148,8 @@ try {
         $salePrice,
         $costPrice,
         $unit,
+        $createdByUserId,
+        $createdByName,
         $stock,
         $minimumStock,
         $origin,
@@ -161,6 +166,32 @@ try {
         $updateSku = $mysqli->prepare("UPDATE {$storageTable} SET sku = ? WHERE id = ?");
         $updateSku->bind_param('si', $generatedSku, $batchId);
         $updateSku->execute();
+        $sku = $generatedSku;
+    }
+
+    createInventoryActivityNotifications(
+        $mysqli,
+        'created',
+        $materialName,
+        $unit === 'piece' ? 'piece' : 'batch',
+        (int) $batchId,
+        (int) ($_SESSION['user_id'] ?? 0),
+        (string) ($_SESSION['full_name'] ?? 'Unknown'),
+        null,
+        (string) $sku
+    );
+
+    if ((float) $stock <= (float) $minimumStock) {
+        createLowStockNotifications(
+            $mysqli,
+            $materialName,
+            $unit === 'piece' ? 'piece' : 'batch',
+            (int) $batchId,
+            (float) $stock,
+            (float) $minimumStock,
+            $unit,
+            (string) ($_SESSION['full_name'] ?? 'System')
+        );
     }
 
     $mysqli->commit();

@@ -1,0 +1,13 @@
+USE circuleather;
+
+ALTER TABLE batches
+    ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(120) NULL;
+
+ALTER TABLE individual_pieces
+    ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(120) NULL;
+
+ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(120) NULL;

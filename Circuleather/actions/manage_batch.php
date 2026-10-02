@@ -56,6 +56,7 @@ $getValue = static function (string $key): string {
 
 try {
     require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../lib/notifications.php';
     $findBatch = $mysqli->prepare("SELECT * FROM {$detailTable} WHERE id = ?");
     $findBatch->bind_param('i', $batchDetailId);
     $findBatch->execute();
@@ -74,6 +75,17 @@ try {
             return;
         }
 
+        createInventoryActivityNotifications(
+            $mysqli,
+            'deleted',
+            (string) $existingBatch['material_name'],
+            $isPieceDetail ? 'piece' : 'batch',
+            $batchDetailId,
+            (int) ($_SESSION['user_id'] ?? 0),
+            (string) ($_SESSION['full_name'] ?? 'Unknown'),
+            null,
+            (string) ($existingBatch['sku'] ?? '')
+        );
         $removeStoredPhoto($existingBatch['batch_photo_path'] ?? null);
         $removeStoredPhoto($existingBatch['inspection_photo_path'] ?? null);
         header('Location: ?page=inventory&view=' . $detailInventoryView . '&deleted=1');
@@ -128,6 +140,35 @@ try {
     $minimumStock = $minimumStock === '' ? '0' : $minimumStock;
     $origin = $origin === '' ? null : $origin;
     $arrivalDate = $arrivalDate === '' ? null : $arrivalDate;
+    $changePairs = [
+        'sku' => [$existingBatch['sku'] ?? null, $sku],
+        'material_name' => [$existingBatch['material_name'] ?? null, $materialName],
+        'grade' => [$existingBatch['grade'] ?? null, $grade],
+        'color' => [$existingBatch['color'] ?? null, $color],
+        'thickness' => [$existingBatch['thickness'] ?? null, $thickness],
+        'sale_price' => [$existingBatch['sale_price'] ?? null, $salePrice],
+        'cost_price' => [$existingBatch['cost_price'] ?? null, $costPrice],
+        'unit' => [$existingBatch['unit'] ?? null, $unit],
+        'stock' => [$existingBatch['stock'] ?? null, $stock],
+        'minimum_stock' => [$existingBatch['minimum_stock'] ?? null, $minimumStock],
+        'origin' => [$existingBatch['origin'] ?? null, $origin],
+        'supplier' => [$existingBatch['supplier'] ?? null, $supplier],
+        'arrival_date' => [$existingBatch['arrival_date'] ?? null, $arrivalDate],
+    ];
+    $numericChangeFields = ['sale_price', 'cost_price', 'stock', 'minimum_stock'];
+    $changes = [];
+    foreach ($changePairs as $field => [$before, $after]) {
+        if (in_array($field, $numericChangeFields, true)) {
+            $before = $before === null || $before === '' ? null : number_format((float) $before, 2, '.', '');
+            $after = $after === null || $after === '' ? null : number_format((float) $after, 2, '.', '');
+        } else {
+            $before = $before === null || $before === '' ? null : (string) $before;
+            $after = $after === null || $after === '' ? null : (string) $after;
+        }
+        if ($before !== $after) {
+            $changes[$field] = ['before' => $before, 'after' => $after];
+        }
+    }
     $batchPhotoPath = $existingBatch['batch_photo_path'];
     $inspectionPhotoPath = $existingBatch['inspection_photo_path'];
 
@@ -212,6 +253,31 @@ try {
         $batchDetailId
     );
     $updateBatch->execute();
+    createInventoryActivityNotifications(
+        $mysqli,
+        'updated',
+        $materialName,
+        $isPieceDetail ? 'piece' : 'batch',
+        $batchDetailId,
+        (int) ($_SESSION['user_id'] ?? 0),
+        (string) ($_SESSION['full_name'] ?? 'Unknown'),
+            $changes,
+            (string) $sku
+    );
+    $wasLowStock = (float) $existingBatch['stock'] <= (float) $existingBatch['minimum_stock'];
+    $isLowStock = (float) $stock <= (float) $minimumStock;
+    if (!$wasLowStock && $isLowStock) {
+        createLowStockNotifications(
+            $mysqli,
+            $materialName,
+            $isPieceDetail ? 'piece' : 'batch',
+            $batchDetailId,
+            (float) $stock,
+            (float) $minimumStock,
+            $unit,
+            (string) ($_SESSION['full_name'] ?? 'System')
+        );
+    }
     $mysqli->commit();
     $transactionOpen = false;
 

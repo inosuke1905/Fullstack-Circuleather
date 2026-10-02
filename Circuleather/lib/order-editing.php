@@ -50,7 +50,13 @@ function orderDecimal(int $amount): string
     return intdiv($amount, 100) . '.' . str_pad((string) ($amount % 100), 2, '0', STR_PAD_LEFT);
 }
 
-function applyOrderAction(mysqli $db, int $id, array $input): string
+function applyOrderAction(
+    mysqli $db,
+    int $id,
+    array $input,
+    ?callable $onStockChanged = null,
+    ?callable $onOrderChanged = null
+): string
 {
     $action = $input['action'] ?? 'update';
     if (!is_string($action) || !in_array($action, ['update', 'delete'], true)) {
@@ -60,7 +66,7 @@ function applyOrderAction(mysqli $db, int $id, array $input): string
         deleteOrder($db, $id, is_string($input['revision'] ?? null) ? $input['revision'] : '');
         return 'deleted';
     }
-    updateOrder($db, $id, $input);
+    updateOrder($db, $id, $input, $onStockChanged, $onOrderChanged);
     return 'saved';
 }
 
@@ -116,7 +122,13 @@ function deleteOrder(mysqli $db, int $id, string $revision): void
     }
 }
 
-function updateOrder(mysqli $db, int $id, array $input): void
+function updateOrder(
+    mysqli $db,
+    int $id,
+    array $input,
+    ?callable $onStockChanged = null,
+    ?callable $onOrderChanged = null
+): void
 {
     $text = static fn(string $key): string => is_string($input[$key] ?? null) ? trim($input[$key]) : '';
     $client = [];
@@ -228,6 +240,13 @@ function updateOrder(mysqli $db, int $id, array $input): void
             }
             $inventory[$key] = $row;
             if ($stock !== orderHundredths($row['stock'])) {
+                if (
+                    $onStockChanged !== null
+                    && orderHundredths($row['stock']) > orderHundredths($row['minimum_stock'])
+                    && $stock <= orderHundredths($row['minimum_stock'])
+                ) {
+                    $onStockChanged($type, (int) $inventoryId, $row, orderDecimal($stock));
+                }
                 $stockValue = orderDecimal($stock);
                 $query = $db->prepare("UPDATE {$table} SET stock = ? WHERE id = ?");
                 $query->bind_param('ss', $stockValue, $inventoryId);
@@ -282,6 +301,57 @@ function updateOrder(mysqli $db, int $id, array $input): void
         $query = $db->prepare('UPDATE orders SET client_id = ?, status = ?, payment_status = ?, total_amount = ? WHERE id = ?');
         $query->bind_param('isssi', $clientId, $status, $payment, $total, $id);
         $query->execute();
+
+        $changes = [];
+        $clientFields = [
+            'client_name' => 'client_name',
+            'email' => 'email',
+            'phone' => 'phone',
+            'street_address' => 'street_address',
+            'postal_code' => 'postal_code',
+            'city' => 'city',
+        ];
+        foreach ($clientFields as $field => $orderField) {
+            $before = (string) ($state['order'][$orderField] ?? '');
+            $after = (string) $client[$field];
+            if ($before !== $after) {
+                $changes[$field] = ['before' => $before, 'after' => $after];
+            }
+        }
+        foreach (['status' => $status, 'payment_status' => $payment] as $field => $after) {
+            $before = (string) $state['order'][$field];
+            if ($before !== $after) {
+                $changes[$field] = ['before' => $before, 'after' => $after];
+            }
+        }
+
+        $itemDescription = static function (array $item): string {
+            return trim(
+                ($item['sku'] !== null && $item['sku'] !== '' ? $item['sku'] . ' ' : '')
+                . $item['material_name'] . ' - ' . $item['quantity'] . ' ' . $item['unit']
+                . ' @ ' . $item['unit_price']
+            );
+        };
+        $beforeItems = implode("\n", array_map($itemDescription, $state['items']));
+        $afterItems = [];
+        foreach ($items as $item) {
+            $old = $oldItems[$item['line_id']] ?? null;
+            $snapshot = $old && orderInventoryKey($old) === $item['key'] ? $old : $inventory[$item['key']];
+            $afterItems[] = $itemDescription([
+                'sku' => $snapshot['sku'],
+                'material_name' => $snapshot['material_name'],
+                'quantity' => orderDecimal($item['quantity']),
+                'unit' => $snapshot['unit'],
+                'unit_price' => orderDecimal($item['price']),
+            ]);
+        }
+        $afterItemsDescription = implode("\n", $afterItems);
+        if ($beforeItems !== $afterItemsDescription) {
+            $changes['order_items'] = ['before' => $beforeItems, 'after' => $afterItemsDescription];
+        }
+        if ($onOrderChanged !== null && $changes !== []) {
+            $onOrderChanged($changes);
+        }
         $db->commit();
     } catch (Throwable $exception) {
         $db->rollback();

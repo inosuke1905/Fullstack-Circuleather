@@ -91,6 +91,7 @@ foreach ($postedItems as $postedItem) {
 
 try {
     require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../lib/notifications.php';
     $mysqli->begin_transaction();
 
     $lockedItems = [];
@@ -98,7 +99,7 @@ try {
     foreach ($items as $item) {
         $batchId = $item['batch_id'];
         $findBatch = $mysqli->prepare(
-            "SELECT id, sku, material_name, grade, color, thickness, unit, stock, sale_price
+            "SELECT id, sku, material_name, grade, color, thickness, unit, stock, minimum_stock, sale_price
              FROM {$orderTable} WHERE id = ? FOR UPDATE"
         );
         $findBatch->bind_param('i', $batchId);
@@ -150,10 +151,12 @@ try {
     }
 
     $orderNumber = 'ORD-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+    $createdByUserId = (int) ($_SESSION['user_id'] ?? 0);
+    $createdByName = (string) ($_SESSION['full_name'] ?? 'Unknown');
     $insertOrder = $mysqli->prepare(
-        'INSERT INTO orders (order_number, client_id, total_amount) VALUES (?, ?, ?)'
+        'INSERT INTO orders (order_number, client_id, total_amount, created_by_user_id, created_by_name) VALUES (?, ?, ?, ?, ?)'
     );
-    $insertOrder->bind_param('sid', $orderNumber, $clientId, $totalAmount);
+    $insertOrder->bind_param('sidis', $orderNumber, $clientId, $totalAmount, $createdByUserId, $createdByName);
     $insertOrder->execute();
     $orderId = (int) $mysqli->insert_id;
 
@@ -201,9 +204,25 @@ try {
         if ($reduceStock->affected_rows !== 1) {
             throw new DomainException('insufficient_stock');
         }
+        $previousStock = (float) $batch['stock'];
+        $newStock = $previousStock - (float) $quantity;
+        $minimumStock = (float) $batch['minimum_stock'];
+        if ($previousStock > $minimumStock && $newStock <= $minimumStock) {
+            createLowStockNotifications(
+                $mysqli,
+                (string) $batch['material_name'],
+                $postedOrderType === 'pieces' ? 'piece' : 'batch',
+                $inventoryId,
+                $newStock,
+                $minimumStock,
+                (string) $batch['unit'],
+                (string) ($_SESSION['full_name'] ?? 'System')
+            );
+        }
     }
 
     $mysqli->commit();
+    createOrderNotifications($mysqli, 'created', $orderNumber, $orderId, (string) ($_SESSION['full_name'] ?? 'System'));
     header('Location: ?page=order-detail&id=' . $orderId . '&created=1');
     exit;
 } catch (DomainException $exception) {

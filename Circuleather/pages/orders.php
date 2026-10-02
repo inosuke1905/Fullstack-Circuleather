@@ -28,7 +28,7 @@ try {
 
     $searchPattern = '%' . $orderSearch . '%';
     $orderQuery = $mysqli->prepare(
-        'SELECT o.id, o.order_number, o.created_at, o.status, o.payment_status, o.total_amount,
+        'SELECT o.id, o.order_number, o.created_at, o.created_by_name, o.status, o.payment_status, o.total_amount,
             c.full_name AS client_name, COUNT(oi.id) AS item_count,
             COALESCE(SUM(CASE WHEN oi.unit = "kg" THEN oi.quantity ELSE 0 END), 0) AS total_kg,
             COALESCE(SUM(CASE WHEN oi.unit = "piece" THEN oi.quantity ELSE 0 END), 0) AS total_pieces
@@ -36,7 +36,7 @@ try {
          INNER JOIN clients c ON c.id = o.client_id
          LEFT JOIN order_items oi ON oi.order_id = o.id
          WHERE (? = "" OR o.order_number LIKE ? OR c.full_name LIKE ? OR c.email LIKE ?)
-         GROUP BY o.id, o.order_number, o.created_at, o.status, o.payment_status,
+         GROUP BY o.id, o.order_number, o.created_at, o.created_by_name, o.status, o.payment_status,
             o.total_amount, c.full_name
          ORDER BY o.id DESC'
     );
@@ -60,7 +60,7 @@ $orderStatusLabel = static fn (string $status): string => match ($status) {
 <section class="page-section orders-page" aria-labelledby="orders-title">
     <div class="page-heading">
         <div><p class="eyebrow"><?= t('Bestellingen', 'Orders') ?></p><h1 id="orders-title"><?= t('Orderoverzicht', 'Orders overview') ?></h1></div>
-        <a class="button button-primary" href="?page=new-order">+ <?= t('Nieuwe order', 'New order') ?></a>
+        <a class="button button-primary" href="?page=new-order"><?= t('Nieuwe order', 'New order') ?></a>
     </div>
     <?php if (isset($_GET['created'])): ?>
         <p class="settings-saved" role="status"><?= t('Order aangemaakt en voorraad bijgewerkt.', 'Order created and inventory updated.') ?></p>
@@ -93,6 +93,7 @@ $orderStatusLabel = static fn (string $status): string => match ($status) {
                 <th scope="col"><?= t('Order', 'Order') ?></th>
                 <th scope="col"><?= t('Klant', 'Customer') ?></th>
                 <th scope="col"><?= t('Datum', 'Date') ?></th>
+                <th scope="col"><?= t('Aangemaakt door', 'Created by') ?></th>
                 <th scope="col"><?= t('Artikelen', 'Items') ?></th>
                 <th scope="col"><?= t('Hoeveelheid', 'Quantity') ?></th>
                 <th scope="col"><?= t('Omzet', 'Revenue') ?></th>
@@ -103,13 +104,14 @@ $orderStatusLabel = static fn (string $status): string => match ($status) {
         </thead>
         <tbody>
             <?php if ($orders === []): ?>
-                <tr><td colspan="9"><?php if ($orderSearch !== ''): ?><?= t('Geen bestellingen gevonden.', 'No orders found.') ?><?php elseif ($ordersError === null): ?><?= t('Er zijn nog geen bestellingen.', 'There are no orders yet.') ?> <a href="?page=new-order"><?= t('Maak de eerste order aan.', 'Create the first order.') ?></a><?php else: ?><?= $ordersError ?><?php endif; ?></td></tr>
+                <tr><td colspan="10"><?php if ($orderSearch !== ''): ?><?= t('Geen bestellingen gevonden.', 'No orders found.') ?><?php elseif ($ordersError === null): ?><?= t('Er zijn nog geen bestellingen.', 'There are no orders yet.') ?> <a href="?page=new-order"><?= t('Maak de eerste order aan.', 'Create the first order.') ?></a><?php else: ?><?= $ordersError ?><?php endif; ?></td></tr>
             <?php else: ?>
                 <?php foreach ($orders as $order): ?>
                     <tr>
                         <td><a href="?page=order-detail&amp;id=<?= (int) $order['id'] ?>"><?= escape($order['order_number']) ?></a></td>
                         <td><?= escape($order['client_name']) ?></td>
                         <td><?= escape(date('d M Y', strtotime($order['created_at']))) ?></td>
+                        <td><?= !empty($order['created_by_name']) ? escape($order['created_by_name']) : t('Onbekend', 'Unknown') ?></td>
                         <td><?= (int) $order['item_count'] ?> <?= t('artikelen', 'items') ?></td>
                         <td><?php if ((float) $order['total_kg'] > 0): ?><?= $formatOrderNumber($order['total_kg']) ?> kg<?php endif; ?><?php if ((float) $order['total_kg'] > 0 && (float) $order['total_pieces'] > 0): ?><br><?php endif; ?><?php if ((float) $order['total_pieces'] > 0): ?><?= (int) $order['total_pieces'] ?> <?= t('stuks', 'pieces') ?><?php endif; ?></td>
                         <td>€ <?= $formatOrderNumber($order['total_amount']) ?></td>
