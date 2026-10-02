@@ -1,4 +1,10 @@
 <?php
+/*
+ * CLI integration checks for separate batch/piece storage, rendering, editing and deletion.
+ * Each command mode exercises a real action or template using known test fixtures.
+ * The DB_NAME guard prevents fixture writes against the application database.
+ */
+
 // Run only against the disposable migration rehearsal database.
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli' || getenv('DB_NAME') !== 'circuleather_storage_test') {
@@ -15,8 +21,10 @@ function check(bool $condition, string $message): void {
     if (!$condition) { throw new RuntimeException($message); }
 }
 require __DIR__ . '/../db.php';
-$_SESSION = ['csrf_token' => 'storage-smoke'];
+// Supply the session context normally initialized by index.php.
+$_SESSION = ['csrf_token' => 'storage-smoke', 'user_id' => 0, 'full_name' => 'Storage test'];
 $_FILES = [];
+// Separate CLI modes are needed because successful action handlers redirect and exit.
 $mode = $argv[1] ?? 'render';
 $pieceMode = !str_contains($mode, 'batch');
 $sku = $mode === 'create-delete-piece' || $mode === 'delete-piece' ? 'TEST-PIECE-DELETE' : ($pieceMode ? 'TEST-PIECE-STORAGE' : 'TEST-BATCH-STORAGE');
@@ -51,6 +59,7 @@ if ($mode === 'edit-piece' || $mode === 'delete-piece' || $mode === 'reject-dele
     $fixture = $findFixture();
     check($fixture !== null, 'Missing fixture');
     $batchDetailId = (int) $fixture['id'];
+    $isPieceDetail = true;
     $detailTable = 'individual_pieces';
     $detailRoute = 'piece-detail';
     $detailUnit = 'piece';
@@ -68,6 +77,42 @@ if ($mode === 'edit-piece' || $mode === 'delete-piece' || $mode === 'reject-dele
     check($mode === 'reject-delete-piece' && $detailError !== null && $findFixture() !== null, 'Order-linked piece was deleted');
     echo "Referenced piece deletion correctly rejected.\n";
     exit;
+}
+
+// Multiple lines exercise statement reuse with different bound inventory IDs and prices.
+if (in_array($mode, ['order-multi-batch', 'order-multi-piece'], true)) {
+    $fixture = $findFixture();
+    check($fixture !== null, 'Missing first multi-line fixture');
+    $beforeStock = (float) $fixture['stock'];
+    $mysqli->query("INSERT INTO {$table} (sku, material_name, grade, sale_price, cost_price, unit, stock, supplier)
+        VALUES ('TEST-MULTI-SECOND', 'Second multi-line material', 'A', 30, 10, '{$payload['unit']}', 10, 'Test')");
+    $secondId = (int) $mysqli->insert_id;
+    $firstQuantity = $pieceMode ? '2' : '1.5';
+    $secondQuantity = $pieceMode ? '2' : '0.5';
+    $_POST = [
+        'csrf_token' => 'storage-smoke', 'order_type' => $pieceMode ? 'pieces' : 'batch',
+        'client_name' => 'Storage test', 'email' => 'storage-test@example.invalid',
+        'street_address' => 'Test street', 'postal_code' => '1000AA', 'city' => 'Test', 'phone' => '123',
+        'items' => [
+            ['inventory_id' => (string) $fixture['id'], 'quantity' => $firstQuantity],
+            ['inventory_id' => (string) $secondId, 'quantity' => $secondQuantity],
+        ],
+    ];
+    register_shutdown_function(static function () use ($mysqli, $findFixture, $fixture, $beforeStock, $table, $pieceMode, $secondId, $firstQuantity, $secondQuantity): void {
+        $order = $mysqli->query('SELECT * FROM orders ORDER BY id DESC LIMIT 1')->fetch_assoc();
+        $lines = $mysqli->query('SELECT * FROM order_items WHERE order_id = ' . (int) $order['id'] . ' ORDER BY id')->fetch_all(MYSQLI_ASSOC);
+        $reference = $pieceMode ? 'individual_piece_id' : 'batch_id';
+        check(count($lines) === 2 && (int) $lines[0][$reference] === (int) $fixture['id']
+            && (int) $lines[1][$reference] === $secondId, 'Multi-line inventory references failed');
+        check((float) $lines[0]['unit_price'] === 20.0 && (float) $lines[1]['unit_price'] === 30.0
+            && (float) $order['total_amount'] === (float) $firstQuantity * 20 + (float) $secondQuantity * 30, 'Multi-line prices or total failed');
+        $second = $mysqli->query("SELECT stock FROM {$table} WHERE id = {$secondId}")->fetch_assoc();
+        check((float) $findFixture()['stock'] === $beforeStock - (float) $firstQuantity
+            && (float) $second['stock'] === 10 - (float) $secondQuantity, 'Multi-line stock deductions failed');
+        echo "Multi-line order, snapshots, totals and stock deductions passed.\n";
+    });
+    require __DIR__ . '/../actions/save_order.php';
+    throw new RuntimeException($orderError ?? 'Multi-line creation did not redirect');
 }
 
 if (str_starts_with($mode, 'order-') || $mode === 'reject-fraction') {

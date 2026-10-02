@@ -1,3 +1,9 @@
+/*
+ * Displays the notification badge, recent-alert list and transient toasts.
+ * Polls the authenticated JSON endpoint every 45 seconds; delivery tracking is handled by the server.
+ * Database text is inserted with textContent, and navigation is limited to local page URLs.
+ */
+
 (() => {
     const center = document.querySelector('[data-notification-center]');
     if (!center) return;
@@ -10,8 +16,14 @@
     const toasts = center.querySelector('.notification-toasts');
     const csrfToken = document.body.dataset.csrfToken || '';
     const endpoint = 'actions/notifications.php';
+    // Reuse the locale formatter across alerts and polling cycles.
+    const timeFormatter = new Intl.DateTimeFormat(center.dataset.timeLocale || undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
     let polling = false;
 
+    // Only allow application-relative page links from notification data.
     const safeUrl = (url) => typeof url === 'string' && /^\?page=[a-z-]+(?:&[a-zA-Z0-9_=%-]*)*$/.test(url)
         ? url
         : '?page=inventory';
@@ -27,10 +39,7 @@
         const date = new Date(String(item.created_at || '').replace(' ', 'T'));
         const time = Number.isNaN(date.getTime())
             ? String(item.created_at || '')
-            : new Intl.DateTimeFormat(center.dataset.timeLocale || undefined, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-            }).format(date);
+            : timeFormatter.format(date);
         const action = item.event_action || 'updated';
         const verb = item.type === 'inventory_activity'
             ? english
@@ -108,6 +117,7 @@
         empty.hidden = items.length > 0;
     };
 
+    // Do not overlap polls; reset the flag even after a network or JSON failure.
     const poll = async () => {
         if (polling) return;
         polling = true;

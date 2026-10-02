@@ -1,4 +1,9 @@
 <?php
+/*
+ * Creates an order, its customer association and a snapshot of each purchased material.
+ * Inventory rows are locked during stock validation and reservation to prevent overselling.
+ * The order, line items and stock deductions commit together or roll back together.
+ */
 
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
@@ -53,6 +58,7 @@ if (
     return;
 }
 
+// Validate each line and reject duplicates before taking inventory locks.
 $items = [];
 $seenBatchIds = [];
 foreach ($postedItems as $postedItem) {
@@ -96,12 +102,13 @@ try {
 
     $lockedItems = [];
     $totalAmount = 0.0;
+    // Prepare once and reuse for every line; FOR UPDATE holds locks until commit or rollback.
+    $findBatch = $mysqli->prepare(
+        "SELECT id, sku, material_name, grade, color, thickness, unit, stock, minimum_stock, sale_price
+         FROM {$orderTable} WHERE id = ? FOR UPDATE"
+    );
     foreach ($items as $item) {
         $batchId = $item['batch_id'];
-        $findBatch = $mysqli->prepare(
-            "SELECT id, sku, material_name, grade, color, thickness, unit, stock, minimum_stock, sale_price
-             FROM {$orderTable} WHERE id = ? FOR UPDATE"
-        );
         $findBatch->bind_param('i', $batchId);
         $findBatch->execute();
         $batch = $findBatch->get_result()->fetch_assoc();
@@ -128,6 +135,7 @@ try {
         ];
     }
 
+    // Customers are shared by email, while material details are copied into order-item snapshots.
     $findClient = $mysqli->prepare('SELECT id FROM clients WHERE email = ? FOR UPDATE');
     $findClient->bind_param('s', $email);
     $findClient->execute();
@@ -160,6 +168,14 @@ try {
     $insertOrder->execute();
     $orderId = (int) $mysqli->insert_id;
 
+    // Reuse these statements for all lines instead of preparing the same SQL for each item.
+    $insertItem = $mysqli->prepare(
+        'INSERT INTO order_items (
+            order_id, batch_id, individual_piece_id, sku, material_name, grade, color, thickness,
+            quantity, unit, unit_price, line_total
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $reduceStock = $mysqli->prepare("UPDATE {$orderTable} SET stock = stock - ? WHERE id = ? AND stock >= ?");
     foreach ($lockedItems as $item) {
         $batch = $item['batch'];
         $inventoryId = (int) $batch['id'];
@@ -175,12 +191,6 @@ try {
         $unitPrice = $item['unit_price'];
         $lineTotal = $item['line_total'];
 
-        $insertItem = $mysqli->prepare(
-            'INSERT INTO order_items (
-                order_id, batch_id, individual_piece_id, sku, material_name, grade, color, thickness,
-                quantity, unit, unit_price, line_total
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
         $insertItem->bind_param(
             'iiisssssdsdd',
             $orderId,
@@ -198,7 +208,6 @@ try {
         );
         $insertItem->execute();
 
-        $reduceStock = $mysqli->prepare("UPDATE {$orderTable} SET stock = stock - ? WHERE id = ? AND stock >= ?");
         $reduceStock->bind_param('did', $quantity, $inventoryId, $quantity);
         $reduceStock->execute();
         if ($reduceStock->affected_rows !== 1) {
@@ -221,6 +230,7 @@ try {
         }
     }
 
+    // Publish the success redirect only once the order and every stock deduction are saved.
     $mysqli->commit();
     createOrderNotifications($mysqli, 'created', $orderNumber, $orderId, (string) ($_SESSION['full_name'] ?? 'System'));
     header('Location: ?page=order-detail&id=' . $orderId . '&created=1');

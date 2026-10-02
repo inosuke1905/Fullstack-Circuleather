@@ -1,4 +1,10 @@
 <?php
+/*
+ * Inventory overview with separate views for kilogram batches and individual pieces.
+ * Validates search/filter choices, loads summary totals and renders matching records.
+ * Summary cards cover the selected inventory type, while the table applies the active filters.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -30,6 +36,7 @@ $inventoryStats = [
 
 try {
     require_once __DIR__ . '/../db.php';
+    // Compute overview totals separately so searching does not change the summary cards.
     $statsQuery = $mysqli->prepare(
         "SELECT
             COUNT(*) AS batch_count,
@@ -44,6 +51,7 @@ try {
     $inventoryStats = $statsQuery->get_result()->fetch_assoc();
 
     $searchPattern = '%' . $searchQuery . '%';
+    // Search terms and filters are parameters; the table name comes from the fixed view choice above.
     $batchQuery = $mysqli->prepare(
         "SELECT id, sku, material_name, grade, color, thickness, stock, minimum_stock,
             sale_price, unit, supplier, origin, created_by_name

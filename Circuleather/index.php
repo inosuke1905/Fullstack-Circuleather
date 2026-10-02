@@ -1,9 +1,15 @@
 <?php
+/*
+ * Application entry point: checks the session, routes requests and renders the shared layout.
+ * POST handlers run before HTML output so they can redirect after saving.
+ * Page templates receive the validated route, language and record IDs defined here.
+ */
 
 declare(strict_types=1);
 
 define('CIRCULEATHER_APP', true);
 
+// A migration lock pauses normal requests while inventory tables are being reorganized.
 if (is_file(__DIR__ . '/database/.inventory-migration')) {
     http_response_code(503);
     header('Retry-After: 60');
@@ -21,6 +27,7 @@ $defaults = [
 session_start();
 $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
 
+// Refresh identity on every request so disabled accounts and role changes take effect immediately.
 if (isset($_SESSION['user_id'])) {
     try {
         require_once __DIR__ . '/db.php';
@@ -48,11 +55,13 @@ if (isset($_SESSION['user_id'])) {
 $settings = array_merge($defaults, is_array($_SESSION['settings'] ?? null) ? $_SESSION['settings'] : []);
 $language = ($settings['language'] ?? 'nl') === 'en' ? 'en' : 'nl';
 
+// Escape values at the HTML boundary, including quotes used in attributes.
 function escape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+// Translations are already HTML-escaped; callers can print the returned text directly.
 function t(string $dutch, string $english): string
 {
     global $language;
@@ -63,6 +72,7 @@ $requestedPage = $_GET['page'] ?? 'inventory';
 if (!is_string($requestedPage)) {
     $requestedPage = 'inventory';
 }
+// Keep old registration URLs working as redirects; only administrators can create accounts.
 if ($requestedPage === 'register') {
     header('Location: ?page=login');
     exit;
@@ -88,7 +98,7 @@ if ($requestedPage === 'logout' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $authError = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($requestedPage, ['login', 'register', 'logout'], true)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($requestedPage, ['login', 'logout'], true)) {
     require __DIR__ . '/actions/authenticate.php';
 }
 
@@ -153,11 +163,13 @@ $authPages = [
     'login' => $language === 'en' ? 'Log in' : 'Inloggen',
 ];
 
-$page = $_GET['page'] ?? 'inventory';
+$page = $requestedPage;
+// Only allow known template names; query strings never become arbitrary include paths.
 $routes = [...array_keys($pages), 'batch-detail', 'piece-detail', 'order-detail', ...array_keys($authPages), 'logout'];
 if (!is_string($page) || !in_array($page, $routes, true)) {
     $page = 'inventory';
 }
+// Both inventory and order detail routes use a validated numeric id parameter.
 $rawBatchId = $_GET['id'] ?? '';
 $batchDetailId = is_string($rawBatchId) && ctype_digit($rawBatchId) ? (int) $rawBatchId : 0;
 $isPieceDetail = $page === 'piece-detail';
@@ -165,9 +177,9 @@ $detailTable = $isPieceDetail ? 'individual_pieces' : 'batches';
 $detailRoute = $isPieceDetail ? 'piece-detail' : 'batch-detail';
 $detailUnit = $isPieceDetail ? 'piece' : 'kg';
 $detailInventoryView = $isPieceDetail ? 'pieces' : 'batches';
-$submitted = $_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'batch';
+// Run write actions before the layout so redirects can send headers normally.
 $batchError = null;
-if ($submitted) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'batch') {
     require __DIR__ . '/actions/save_batch.php';
 }
 $detailError = null;
@@ -196,7 +208,7 @@ $title = $pages[$page] ?? $authPages[$page] ?? match ($page) {
     'batch-detail' => $language === 'en' ? 'Batch details' : 'Batchdetails',
     'piece-detail' => $language === 'en' ? 'Leather piece details' : 'Leerstukdetails',
     'order-detail' => $language === 'en' ? 'Order details' : 'Orderdetails',
-    default => $language === 'en' ? 'Circuleather' : 'Circuleather',
+    default => 'Circuleather',
 };
 ?>
 <!doctype html>
@@ -209,6 +221,10 @@ $title = $pages[$page] ?? $authPages[$page] ?? match ($page) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <?php if (in_array($page, ['batch', 'new-order'], true)): ?>
+        <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+        <script src="excel-import.js?v=<?= hash_file('sha256', __DIR__ . '/excel-import.js') ?>" defer></script>
+    <?php endif; ?>
     <?php if ($page === 'new-order'): ?>
         <script src="order-form.js?v=<?= hash_file('sha256', __DIR__ . '/order-form.js') ?>" defer></script>
     <?php endif; ?>

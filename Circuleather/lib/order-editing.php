@@ -1,4 +1,10 @@
 <?php
+/*
+ * Shared order editing and deletion rules, independent of the HTML templates.
+ * Revision hashes reject stale form submissions; row locks protect stock changes.
+ * Money and quantities use integer hundredths rather than floating-point arithmetic.
+ */
+
 declare(strict_types=1);
 
 if (!defined('CIRCULEATHER_APP')) {
@@ -6,6 +12,7 @@ if (!defined('CIRCULEATHER_APP')) {
     exit;
 }
 
+// Read the order, customer and lines as one state; use locking reads during a write transaction.
 function orderEditState(mysqli $db, int $id, bool $lock = false): ?array
 {
     $query = $db->prepare(
@@ -26,11 +33,13 @@ function orderEditState(mysqli $db, int $id, bool $lock = false): ?array
     return ['order' => $order, 'items' => $query->get_result()->fetch_all(MYSQLI_ASSOC)];
 }
 
+// The form sends this fingerprint back; a changed state makes the old form stale.
 function orderEditRevision(array $state): string
 {
     return hash('sha256', json_encode($state, JSON_THROW_ON_ERROR));
 }
 
+// Include the table type in the key because a batch and piece can have the same numeric ID.
 function orderInventoryKey(array $item): string
 {
     return $item['individual_piece_id'] !== null
@@ -45,11 +54,13 @@ function orderHundredths(string $amount): int
     return (int) $whole * 100 + (int) str_pad($fraction, 2, '0');
 }
 
+// Convert integer hundredths back to the two-decimal string expected by DECIMAL columns.
 function orderDecimal(int $amount): string
 {
     return intdiv($amount, 100) . '.' . str_pad((string) ($amount % 100), 2, '0', STR_PAD_LEFT);
 }
 
+// Dispatch only supported form actions and return the redirect outcome to the caller.
 function applyOrderAction(
     mysqli $db,
     int $id,
@@ -70,6 +81,7 @@ function applyOrderAction(
     return 'saved';
 }
 
+// Delete using a locked, revision-checked state and return stock only for unsent orders.
 function deleteOrder(mysqli $db, int $id, string $revision): void
 {
     $db->begin_transaction();
@@ -122,6 +134,7 @@ function deleteOrder(mysqli $db, int $id, string $revision): void
     }
 }
 
+// Validate first, then reconcile old/new reservations and save every affected row atomically.
 function updateOrder(
     mysqli $db,
     int $id,
@@ -220,6 +233,7 @@ function updateOrder(
         }
         $inventory = [];
         $keys = array_unique([...array_keys($oldReserved), ...array_keys($newReserved)]);
+        // Lock inventory in a consistent order to reduce deadlock risk across concurrent edits.
         sort($keys, SORT_STRING);
         foreach ($keys as $key) {
             [$type, $inventoryId] = explode(':', $key);
@@ -231,6 +245,7 @@ function updateOrder(
             if (!$row) {
                 throw new DomainException('missing_inventory');
             }
+            // Return the old reservation, then subtract the new one; cancelled orders reserve nothing.
             $stock = orderHundredths($row['stock']) + ($oldReserved[$key] ?? 0) - ($newReserved[$key] ?? 0);
             if ($stock < 0) {
                 throw new DomainException('insufficient_stock');
@@ -274,6 +289,7 @@ function updateOrder(
         $retained = [];
         foreach ($items as $item) {
             $old = $oldItems[$item['line_id']] ?? null;
+            // Preserve original material details for retained lines; replacements get the current inventory snapshot.
             $snapshot = $old && orderInventoryKey($old) === $item['key'] ? $old : $inventory[$item['key']];
             $batchId = $item['type'] === 'batch' ? $item['inventory_id'] : null;
             $pieceId = $item['type'] === 'piece' ? $item['inventory_id'] : null;

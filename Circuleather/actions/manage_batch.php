@@ -1,4 +1,9 @@
 <?php
+/*
+ * Updates or deletes the record selected by the batch or piece detail route.
+ * The router supplies an allowed table and fixed unit; edits cannot move a record between tables.
+ * Photo replacement and notification history follow the outcome of the database save.
+ */
 
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
@@ -32,6 +37,7 @@ $cleanupUploads = static function () use (&$storedUploads): void {
     }
 };
 
+// Resolve the path inside the upload directory before removing an old photo.
 $removeStoredPhoto = static function (?string $relativePath): void {
     if (!is_string($relativePath) || !str_starts_with($relativePath, 'uploads/batches/')) {
         return;
@@ -66,6 +72,7 @@ try {
         return;
     }
 
+    // Foreign keys refuse deletion while an order still references this inventory record.
     if ($action === 'delete') {
         $deleteBatch = $mysqli->prepare("DELETE FROM {$detailTable} WHERE id = ?");
         $deleteBatch->bind_param('i', $batchDetailId);
@@ -140,6 +147,7 @@ try {
     $minimumStock = $minimumStock === '' ? '0' : $minimumStock;
     $origin = $origin === '' ? null : $origin;
     $arrivalDate = $arrivalDate === '' ? null : $arrivalDate;
+    // Normalize numeric values before comparison so formatting alone does not create change history.
     $changePairs = [
         'sku' => [$existingBatch['sku'] ?? null, $sku],
         'material_name' => [$existingBatch['material_name'] ?? null, $materialName],
@@ -172,6 +180,7 @@ try {
     $batchPhotoPath = $existingBatch['batch_photo_path'];
     $inspectionPhotoPath = $existingBatch['inspection_photo_path'];
 
+    // Retain existing photos unless a validated replacement upload is provided.
     $saveUpload = static function (string $fieldName) use (&$storedUploads): ?string {
         if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
             return null;
@@ -281,6 +290,7 @@ try {
     $mysqli->commit();
     $transactionOpen = false;
 
+    // Delete replaced photos only after the database commit has succeeded.
     if ($newBatchPhotoPath !== null) {
         $removeStoredPhoto($existingBatch['batch_photo_path'] ?? null);
     }

@@ -1,3 +1,9 @@
+/*
+ * Exports the detail page's prepared snapshot card as a PNG using html2canvas.
+ * Temporarily places a visible clone in the document because hidden nodes cannot be captured reliably.
+ * The clone is always removed and the export button restored after success or failure.
+ */
+
 (() => {
     const controls = document.querySelector('[data-share-controls]');
     if (!controls) return;
@@ -26,6 +32,7 @@
         exportButton.disabled = true;
         showStatus(controls.dataset.exportGeneratingLabel || 'Creating PNG...');
 
+        // Use a fixed-size clone for consistent PNG output while retaining the original off-screen card.
         const captureNode = exportCard.cloneNode(true);
         captureNode.style.position = 'relative';
         captureNode.style.left = '0';
@@ -60,6 +67,7 @@
         } catch (error) {
             console.error('PNG export failed:', error);
             showStatus(controls.dataset.exportErrorLabel || 'PNG export could not be created.');
+        // Cleanup is required even if canvas rendering or file generation fails.
         } finally {
             captureNode.remove();
             exportButton.disabled = false;

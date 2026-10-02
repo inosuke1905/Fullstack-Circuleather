@@ -1,3 +1,8 @@
+-- Creates customers, orders and purchased-material snapshots with foreign-key constraints.
+-- An order deletion cascades to its lines; referenced inventory and customers cannot be deleted.
+-- This initial schema precedes individual_pieces.sql, which adds separate piece references.
+
+
 USE circuleather;
 
 CREATE TABLE IF NOT EXISTS clients (

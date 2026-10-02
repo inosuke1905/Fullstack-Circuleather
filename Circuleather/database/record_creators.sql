@@ -1,3 +1,7 @@
+-- Upgrade adding creator IDs and display-name snapshots to inventory and orders.
+-- Nullable fields preserve compatibility with records created before attribution was available.
+
+
 USE circuleather;
 
 ALTER TABLE batches

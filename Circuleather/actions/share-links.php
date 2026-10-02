@@ -1,4 +1,9 @@
 <?php
+/*
+ * Authenticated JSON endpoint for creating or revoking read-only resource links.
+ * Resource types choose from a fixed table map; the raw random token is returned only at creation.
+ * The public share.php endpoint resolves its hash and enforces expiration and revocation.
+ */
 
 declare(strict_types=1);
 
@@ -33,6 +38,7 @@ if (
     $respond(400, ['error' => 'invalid_request']);
 }
 $resourceId = (int) $rawResourceId;
+// Only these resource types may choose table names; bind the numeric resource ID separately.
 $tables = ['batch' => 'batches', 'piece' => 'individual_pieces', 'order' => 'orders'];
 
 try {
@@ -54,6 +60,7 @@ try {
     }
 
     if ($action === 'create') {
+        // The URL carries the random token; store only its SHA-256 hash in the database.
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);
         $creatorName = (string) $currentUser['full_name'];

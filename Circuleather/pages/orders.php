@@ -1,4 +1,10 @@
 <?php
+/*
+ * Order overview with aggregate revenue/status cards and a searchable order table.
+ * Each table row combines customer details with kilogram and piece totals from its order lines.
+ * Cancelled orders are excluded from revenue and unpaid-balance summary amounts.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -27,6 +33,7 @@ try {
     $orderStats = $stats->fetch_assoc();
 
     $searchPattern = '%' . $orderSearch . '%';
+    // Aggregate order lines in this query to avoid loading them separately for every table row.
     $orderQuery = $mysqli->prepare(
         'SELECT o.id, o.order_number, o.created_at, o.created_by_name, o.status, o.payment_status, o.total_amount,
             c.full_name AS client_name, COUNT(oi.id) AS item_count,

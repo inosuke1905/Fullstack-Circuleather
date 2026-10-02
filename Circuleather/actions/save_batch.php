@@ -1,4 +1,9 @@
 <?php
+/*
+ * Validates and creates an inventory record from the Add batch form.
+ * The selected unit determines storage: kilograms in batches, pieces in individual_pieces.
+ * Database changes are transactional; newly uploaded photos are removed when a save fails.
+ */
 
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
@@ -31,6 +36,7 @@ $origin = $getValue('origin');
 $supplier = $getValue('supplier');
 $arrivalDate = $getValue('arrival_date');
 
+// Accept bounded decimal amounts and real calendar dates before opening a transaction.
 $validAmount = static fn (string $value): bool => preg_match('/^\d{1,8}(?:\.\d{1,2})?$/D', $value) === 1;
 $validLengths = mb_strlen($sku) <= 64
     && mb_strlen($materialName) <= 150
@@ -60,6 +66,7 @@ if (
 }
 
 $minimumStock = $minimumStock === '' ? '0' : $minimumStock;
+// The unit-to-table choice is fixed in code, not supplied as a SQL identifier by the form.
 $storageTable = $unit === 'piece' ? 'individual_pieces' : 'batches';
 $sku = $sku === '' ? null : $sku;
 $color = $color === '' ? null : $color;
@@ -77,6 +84,7 @@ $cleanupUploads = static function () use (&$storedUploads): void {
     }
 };
 
+// Check upload status, size and actual MIME type, then store images under random filenames.
 $saveUpload = static function (string $fieldName) use (&$storedUploads): ?string {
     if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
         return null;
@@ -126,6 +134,7 @@ try {
 
     require __DIR__ . '/../db.php';
     require_once __DIR__ . '/../lib/notifications.php';
+    // Photos cannot roll back with SQL; track new files separately for cleanup on failure.
     $mysqli->begin_transaction();
     $transactionOpen = true;
     $createdByUserId = (int) ($_SESSION['user_id'] ?? 0);

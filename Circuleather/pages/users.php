@@ -1,9 +1,16 @@
 <?php
+/*
+ * Administrator-only account management screen.
+ * Loads user records and renders create, edit, password-reset and delete forms.
+ * actions/manage_users.php validates each operation and protects access to the administrator account.
+ */
+
 if (!defined('CIRCULEATHER_APP') || ($_SESSION['role'] ?? '') !== 'admin') {
     http_response_code(403);
     exit;
 }
 
+// Keep account management behind the administrator guard above, including data loading.
 $accounts = [];
 $accountsLoadFailed = false;
 try {

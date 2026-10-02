@@ -1,3 +1,9 @@
+/*
+ * Client-side editor for existing order lines, status and price estimates.
+ * Keeps template-generated input names unique and enforces the visible 30-line limit.
+ * Server-side revision checks and stock validation remain authoritative.
+ */
+
 const orderEditForm = document.querySelector('#order-edit-form');
 
 if (orderEditForm) {
@@ -40,6 +46,7 @@ if (orderEditForm) {
             }
             select.setCustomValidity(select.value && selectedKeys.filter(key => key === select.value).length > 1
                 ? (english ? 'Choose each material only once.' : 'Kies ieder materiaal maximaal eenmaal.') : '');
+            // Estimate totals in cents to match server rounding rather than adding floating-point money.
             const quantityHundredths = Math.round(amount * 100);
             const priceCents = Math.round((Number(price.value) || 0) * 100);
             const lineCents = Math.round(quantityHundredths * priceCents / 100);
@@ -54,6 +61,7 @@ if (orderEditForm) {
         addButton.disabled = rows.length >= 30;
     };
 
+    // Replace template placeholders in ids, names and labels together to keep rows accessible and distinct.
     addButton.addEventListener('click', () => {
         if (items.querySelectorAll('[data-edit-item]').length >= 30) return;
         const fragment = template.content.cloneNode(true);

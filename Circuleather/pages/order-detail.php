@@ -1,4 +1,10 @@
 <?php
+/*
+ * Loads and displays an order for editing, including its material snapshots and change history.
+ * Available stock includes this order's existing reservation so unchanged lines remain valid.
+ * The hidden revision is checked by the server to avoid overwriting another person's changes.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -12,6 +18,7 @@ try {
     $orderState = orderEditState($mysqli, $orderDetailId);
     if ($orderState !== null) {
         $allowedTypes = [];
+        // Add back this order's current reservation when calculating stock available to its editor.
         $reserved = [];
         foreach ($orderState['items'] as $line) {
             $key = orderInventoryKey($line);
@@ -55,6 +62,7 @@ if ($orderState !== null && isset($mysqli)) {
         error_log('Could not load order change history: ' . $exception->getMessage());
     }
 }
+// Keep invalid submitted values for correction; after a revision conflict show the latest saved state.
 $usePosted = $orderEditError !== null && !$orderEditConflict && ($_POST['action'] ?? '') !== 'delete';
 $formValue = static function (string $key) use ($orderState, $usePosted): string {
     $value = $usePosted ? ($_POST[$key] ?? '') : ($orderState['order'][$key] ?? '');

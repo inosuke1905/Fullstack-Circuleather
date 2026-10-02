@@ -1,3 +1,10 @@
+/*
+ * Shared stylesheet for the application layout, forms, tables, themes and PNG/public-share views.
+ * Colors and spacing use CSS custom properties; theme rules override these values.
+ * Keep rule order intact: later component and responsive rules intentionally override earlier defaults.
+ */
+
+/* Base tokens and reset. Later theme tokens override these while preserving the component rules below. */
 :root {
     color-scheme: light;
     --ink: #11110f;
@@ -40,6 +47,7 @@ a {
     color: inherit;
 }
 
+/* Base navigation and branding; later layout rules adapt the same elements to the final header/sidebar design. */
 .sidebar {
     position: fixed;
     z-index: 5;
@@ -395,6 +403,7 @@ input[type="search"] {
     color: var(--muted);
 }
 
+/* Shared data tables: scrolling containers, headings and inventory/order rows. */
 .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--ink);
@@ -497,6 +506,7 @@ tbody td[colspan] a {
     border-color: var(--coral);
 }
 
+/* Batch entry fields and grouped material, pricing, quantity and photo controls. */
 .batch-form {
     display: flex;
     flex-direction: column;
@@ -607,6 +617,7 @@ fieldset legend {
     background: #e6e9e5;
 }
 
+/* Base responsive layout. Component-specific breakpoints later in this file take precedence where needed. */
 @media (max-width: 1100px) {
     main {
         padding-right: 26px;
@@ -674,7 +685,8 @@ fieldset legend {
         font-size: 10px;
     }
 
-    .account-menu {
+    /* Native details/summary account menu and its open-state panel. */
+.account-menu {
         width: 100%;
         --account-menu-height: 52px;
         height: var(--account-menu-height);
@@ -755,6 +767,7 @@ fieldset legend {
 
 }
 
+/* Login branding and form layout, separate from the authenticated application shell. */
 .auth-brand {
     padding: 14px 28px;
     border-bottom: 1px solid var(--line);
@@ -946,6 +959,7 @@ body[data-theme="dark"] .sidebar-nav .nav-logout:hover {
     }
 }
 
+/* Order creation/editing fields, material rows, validation controls and totals. */
 .order-form {
     display: grid;
     gap: 18px;
@@ -1333,6 +1347,7 @@ body[data-theme="dark"] .remove-order-item:hover:not(:disabled) {
     gap: 12px;
 }
 
+/* Notification dropdown and toasts; state is controlled by notifications.js and the hidden attribute. */
 .notification-center {
     position: relative;
     z-index: 20;
@@ -1953,6 +1968,186 @@ body[data-theme="dark"] .sidebar-nav .nav-logout:hover {
     }
 }
 
+/* Spreadsheet import workspace: file actions, column mapping, row preview and status. */
+.excel-import-panel {
+    margin: 0 0 24px;
+    padding: 18px 20px;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    background: var(--white);
+}
+
+.excel-import-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.excel-import-heading .eyebrow {
+    margin-bottom: 3px;
+    color: var(--coral);
+}
+
+.excel-import-heading h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.excel-import-heading p:last-child {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.excel-import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.excel-import-file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.excel-import-template {
+    color: var(--ink);
+    font-size: 12px;
+    text-underline-offset: 3px;
+}
+
+.excel-import-workspace {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.excel-import-workspace[hidden] {
+    display: none;
+}
+
+.excel-import-row-select {
+    display: grid;
+    max-width: 420px;
+    gap: 5px;
+}
+
+.excel-import-row-select label,
+.excel-import-field label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.excel-import-row-select select,
+.excel-import-field select {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--white);
+    font-size: 12px;
+}
+
+.excel-import-mapping {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+}
+
+.excel-import-mapping summary {
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.excel-import-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.excel-import-field {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.excel-import-preview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 18px;
+    max-height: 200px;
+    overflow: auto;
+    margin: 0;
+}
+
+.excel-import-preview dt {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.excel-import-preview dd {
+    overflow-wrap: anywhere;
+    margin: 0;
+    color: var(--ink);
+    font-size: 12px;
+}
+
+.excel-import-status {
+    margin: 12px 0 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+@media (max-width: 760px) {
+    .excel-import-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .excel-import-actions {
+        justify-content: flex-start;
+    }
+
+    .excel-import-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 440px) {
+    .excel-import-panel {
+        padding: 15px;
+    }
+
+    .excel-import-actions {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .excel-import-fields,
+    .excel-import-preview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .inventory-views,
 .order-views {
     display: flex;
@@ -2212,6 +2407,7 @@ body {
     font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
+/* Account preferences, profile information and administrator account forms. */
 .settings-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2533,6 +2729,7 @@ body {
     white-space: nowrap;
 }
 
+/* Before/after change history shared by inventory and order detail pages. */
 .change-history {
     margin: 0 0 24px;
     padding: 18px 0;
@@ -2613,6 +2810,7 @@ body {
     color: var(--muted);
 }
 
+/* Detail-page PNG export controls and the prepared snapshot card. */
 .share-controls {
     margin: 0 0 24px;
     padding: 18px 0;
@@ -2713,6 +2911,7 @@ body {
     margin: 10px 0 0;
 }
 
+/* Read-only shared pages and PNG export cards use this independent white-page layout. */
 .public-share-body {
     min-height: 100vh;
     display: flex;
@@ -3292,6 +3491,7 @@ body[data-theme="dark"] tbody tr:hover {
     }
 }
 
+/* Respect the operating-system preference by shortening transitions and disabling smooth scrolling. */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -3301,6 +3501,7 @@ body[data-theme="dark"] tbody tr:hover {
     }
 }
 
+/* Final brand overrides. Keep these after component rules so the current Poppins/coral design wins the cascade. */
 :root {
     --ink: #191919;
     --pine: #191919;

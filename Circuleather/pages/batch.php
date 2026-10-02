@@ -1,4 +1,10 @@
 <?php
+/*
+ * Add batch form, included by index.php after any save action has been handled.
+ * The Excel panel copies one selected spreadsheet row into this form; it does not save automatically.
+ * Submission is validated by actions/save_batch.php, including uploaded photos.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -13,6 +19,34 @@ if (!defined('CIRCULEATHER_APP')) {
     <?php elseif (isset($_GET['saved'])): ?>
         <p role="status"><?= t('Batch opgeslagen. Je kunt direct een volgende batch toevoegen.', 'Batch saved. You can add another batch now.') ?></p>
     <?php endif; ?>
+
+    <section class="excel-import-panel" data-excel-import="batch" aria-labelledby="batch-import-title">
+        <div class="excel-import-heading">
+            <div>
+                <p class="eyebrow"><?= t('Gegevens overnemen', 'Import data') ?></p>
+                <h2 id="batch-import-title"><?= t('Importeren vanuit Excel', 'Import from Excel') ?></h2>
+                <p><?= t('Kies een bestand, controleer de kolommen en selecteer de batchrij.', 'Choose a file, check the columns, and select the batch row.') ?></p>
+            </div>
+            <div class="excel-import-actions">
+                <a class="excel-import-template" href="#" download="circuleather-batch-template.csv" data-import-template><?= t('Sjabloon downloaden', 'Download template') ?></a>
+                <label class="button button-secondary" for="batch-import-file"><?= t('Excelbestand kiezen', 'Choose Excel file') ?></label>
+                <input id="batch-import-file" class="excel-import-file" type="file" accept=".xlsx,.xls,.csv" data-import-file>
+            </div>
+        </div>
+        <div class="excel-import-workspace" data-import-workspace hidden>
+            <div class="excel-import-row-select">
+                <label for="batch-import-row"><?= t('Rij om over te nemen', 'Row to import') ?></label>
+                <select id="batch-import-row" data-import-row></select>
+            </div>
+            <details class="excel-import-mapping" open>
+                <summary><?= t('Kolommen controleren en koppelen', 'Review and match columns') ?></summary>
+                <div class="excel-import-fields" data-import-fields></div>
+            </details>
+            <dl class="excel-import-preview" data-import-preview></dl>
+            <button class="button button-secondary" type="button" data-import-apply><?= t('Gegevens naar formulier overnemen', 'Fill form with imported data') ?></button>
+        </div>
+        <p class="excel-import-status" data-import-status role="status" aria-live="polite"><?= t('Excelbestanden worden lokaal in je browser gelezen.', 'Excel files are read locally in your browser.') ?></p>
+    </section>
 
     <form class="batch-form" action="?page=batch" method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= escape($_SESSION['csrf_token']) ?>">

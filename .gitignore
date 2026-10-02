@@ -1,0 +1,9 @@
+# Local credentials and backups must not be published with the source code.
+.env
+.env.*
+!.env.example
+backups/
+*.sql.gz
+
+# Uploaded photos belong to each installation, not the public code repository.
+Circuleather/uploads/**

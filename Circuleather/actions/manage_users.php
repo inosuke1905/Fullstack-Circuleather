@@ -1,4 +1,9 @@
 <?php
+/*
+ * Administrator-only handler for creating, editing, deleting and resetting user accounts.
+ * Passwords are hashed, and transactions protect the last active administrator.
+ * Result flags redirect back to pages/users.php, which displays the matching message.
+ */
 
 if (!defined('CIRCULEATHER_APP') || ($_SESSION['role'] ?? '') !== 'admin') {
     http_response_code(403);
@@ -58,6 +63,7 @@ try {
     $userId = (int) $rawUserId;
     $currentUserId = (int) $_SESSION['user_id'];
 
+    // Lock the target account while checking edits, deletion and last-administrator restrictions.
     $mysqli->begin_transaction();
     $transactionStarted = true;
     $findUser = $mysqli->prepare('SELECT id, full_name, email, role, is_active FROM users WHERE id = ? FOR UPDATE');
@@ -121,6 +127,7 @@ try {
         $redirectUsers('invalid');
     }
 
+    // Prevent the signed-in administrator from removing their own access.
     if ($userId === $currentUserId && ($role !== $targetUser['role'] || (int) $activeValue !== (int) $targetUser['is_active'])) {
         $mysqli->rollback();
         $redirectUsers('self');

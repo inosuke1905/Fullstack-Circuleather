@@ -1,3 +1,9 @@
+/*
+ * Client-side material rows and price estimates for the New order form.
+ * Option data supplies stock, unit and price; input/change events also support Excel-imported values.
+ * The server validates inventory and recalculates totals before reserving stock.
+ */
+
 const itemsList = document.querySelector('#order-items');
 const itemTemplate = document.querySelector('#order-item-template');
 const addItemButton = document.querySelector('#add-order-item');
@@ -11,6 +17,7 @@ if (itemsList && itemTemplate && addItemButton && totalOutput) {
     });
     let nextItemIndex = 1;
 
+    // Refresh unit limits and the visible estimate from the selected material option.
     const updateRow = (row) => {
         const select = row.querySelector('.order-batch-select');
         const quantityInput = row.querySelector('.order-quantity');
@@ -61,6 +68,7 @@ if (itemsList && itemTemplate && addItemButton && totalOutput) {
         });
     };
 
+    // Use increasing indices for input names; deleting a row must not reuse another row's index.
     addItemButton.addEventListener('click', () => {
         const row = itemTemplate.content.firstElementChild.cloneNode(true);
         const batchSelect = row.querySelector('[data-batch-select]');
@@ -82,6 +90,7 @@ if (itemsList && itemTemplate && addItemButton && totalOutput) {
         batchSelect.focus();
     });
 
+    // Listen on the list so both existing and newly added rows trigger recalculation.
     itemsList.addEventListener('change', updateForm);
     itemsList.addEventListener('input', updateForm);
     itemsList.addEventListener('click', (event) => {

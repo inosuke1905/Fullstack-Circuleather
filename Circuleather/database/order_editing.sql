@@ -1,3 +1,7 @@
+-- Grants permissions required to edit order lines and delete orders.
+-- Existing foreign keys cascade line deletion and protect referenced customer/inventory records.
+
+
 USE circuleather;
 
 -- Order editing updates retained lines and removes lines taken out of an order.

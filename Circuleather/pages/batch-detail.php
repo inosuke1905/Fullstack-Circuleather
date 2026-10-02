@@ -1,4 +1,10 @@
 <?php
+/*
+ * Shared detail and edit template for batches and individual pieces.
+ * The router supplies the table, route and unit so both record types use the same markup.
+ * Loads the record and the current user's recorded change history before displaying the edit form.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -18,6 +24,7 @@ if ($batchDetailId > 0) {
         $batchDetailLoadError = t('Materiaalgegevens konden niet worden geladen.', 'Material details could not be loaded.');
     }
 }
+// Change history is scoped to notifications delivered to the signed-in user.
 $inventoryChangeHistory = [];
 if ($batchDetail !== null) {
     try {

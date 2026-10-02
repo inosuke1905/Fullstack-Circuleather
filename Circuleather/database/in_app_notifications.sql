@@ -1,3 +1,8 @@
+-- Creates/upgrades the per-user notification inbox and its read/delivery timestamps.
+-- Indexes support unread lists and polling; existing low-stock inventory receives initial alerts.
+-- The NOT EXISTS checks avoid inserting the same initial low-stock alert twice for a recipient.
+
+
 USE circuleather;
 
 CREATE TABLE IF NOT EXISTS notifications (

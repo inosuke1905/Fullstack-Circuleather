@@ -1,4 +1,9 @@
 <?php
+/*
+ * Login form with the session CSRF token and any authentication error.
+ * Posts back to index.php, which runs actions/authenticate.php before rendering this page.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;

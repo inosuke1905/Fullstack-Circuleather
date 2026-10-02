@@ -1,3 +1,8 @@
+-- Stores hashes for random public share tokens, with expiration and revocation metadata.
+-- The resource index supports finding active links for a batch, piece or order.
+-- Deleting a creator keeps the link record and clears its optional user reference.
+
+
 USE circuleather;
 
 CREATE TABLE IF NOT EXISTS share_links (

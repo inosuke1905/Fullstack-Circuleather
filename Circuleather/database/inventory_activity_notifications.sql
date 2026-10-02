@@ -1,3 +1,7 @@
+-- Upgrade adding inventory-activity preferences and structured notification change details.
+-- Run after users and notifications exist; these columns support inventory change history.
+
+
 USE circuleather;
 
 ALTER TABLE users

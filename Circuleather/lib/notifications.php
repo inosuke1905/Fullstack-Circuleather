@@ -1,10 +1,16 @@
 <?php
+/*
+ * Creates localized notification records for stock, account, order and inventory events.
+ * Recipients are selected by their role and saved notification preferences.
+ * Notification failures are logged instead of replacing the main action with an alert error.
+ */
 
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
 }
 
+// Call when stock crosses its alert threshold; each opted-in recipient gets their own language.
 function createLowStockNotifications(
     mysqli $db,
     string $itemName,
@@ -44,6 +50,7 @@ function createLowStockNotifications(
     }
 }
 
+// Turn internal changed-field keys into readable labels in the recipient's language.
 function notificationChangedFields(?array $changes, bool $isEnglish): string
 {
     if ($changes === null || $changes === []) {
@@ -71,6 +78,7 @@ function notificationChangedFields(?array $changes, bool $isEnglish): string
     return implode(', ', $names);
 }
 
+// Store optional before/after values for the detail page's change-history display.
 function notificationDetailsJson(?array $changes): ?string
 {
     return $changes === null || $changes === []
@@ -78,6 +86,7 @@ function notificationDetailsJson(?array $changes): ?string
         : json_encode($changes, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 }
 
+// Account events are visible only to active administrators, independently of order preferences.
 function createAccountNotifications(
     mysqli $db,
     string $event,
@@ -122,6 +131,7 @@ function createAccountNotifications(
     }
 }
 
+// Skip empty update events; deleted-order alerts link to the overview instead of a missing detail page.
 function createOrderNotifications(mysqli $db, string $event, string $orderNumber, int $orderId, string $actorName, ?array $changes = null): void
 {
     $eventLabels = [
@@ -161,6 +171,7 @@ function createOrderNotifications(mysqli $db, string $event, string $orderNumber
     }
 }
 
+// Notify opted-in colleagues about inventory changes, excluding the person who made the change.
 function createInventoryActivityNotifications(
     mysqli $db,
     string $event,

@@ -1,7 +1,13 @@
 <?php
+/*
+ * Public, read-only view of a batch, piece or order identified by a secret share token.
+ * Only the token hash is stored in the database; revoked or expired links return 404.
+ * The public order view intentionally selects no customer contact information.
+ */
 
 declare(strict_types=1);
 
+// Keep token-bearing pages out of caches, search indexes and outgoing referrer headers.
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex, nofollow, noarchive');
 header('Referrer-Policy: no-referrer');
@@ -47,6 +53,7 @@ if (!is_string($token) || preg_match('/^[a-f0-9]{64}$/D', $token) !== 1) {
                 http_response_code(404);
                 $unavailable = true;
             } elseif ($resourceType === 'order') {
+                // Select a public order summary without its customer identity or contact information.
                 $findResource = $mysqli->prepare(
                     'SELECT id, order_number, status, payment_status, total_amount, created_at
                      FROM orders WHERE id = ? LIMIT 1'

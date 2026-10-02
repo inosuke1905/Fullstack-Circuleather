@@ -1,10 +1,15 @@
 <?php
+/*
+ * Builds the PNG export controls and an off-screen card for the current detail page.
+ * The card contains a stable snapshot for html2canvas rather than the editable form.
+ * This authenticated export can include contact details and photos; share.php is a separate public view.
+ */
+
 if (!defined('CIRCULEATHER_APP') || !isset($shareResourceType, $shareResourceId)) {
     http_response_code(404);
     exit;
 }
 
-$shareExportHtml = '';
 $shareExportTitle = '';
 $shareExportSubtitle = '';
 $shareExportFacts = [];
@@ -74,7 +79,6 @@ try {
                     [t('Inzamedatum', 'Arrival date'), $resource['arrival_date'] ? date('d M Y', strtotime($resource['arrival_date'])) : '—'],
                 ];
 
-                $shareExportImages = [];
                 if (!empty($resource['batch_photo_path'])) {
                     $shareExportImages[] = ['label' => t('Materiaalfoto', 'Material photo'), 'src' => $resource['batch_photo_path']];
                 }
@@ -90,6 +94,7 @@ try {
 
 $formatNumber = static fn (float $value): string => number_format($value, 2, ',', '.');
 
+// Build the hidden capture card after loading export data; share-links.js clones it for rendering.
 $shareExportHtml = '<div class="public-share-body" data-share-export-card style="position:fixed;left:-9999px;top:0;visibility:hidden;width:920px;pointer-events:none;z-index:-1;">
     <header class="public-share-header"><a class="brand" href="#"><span class="brand-mark">CL</span><span><strong>CIRCULEATHER</strong><small>' . t('Gedeelde informatie', 'Shared information') . '</small></span></a></header>
     <main class="public-share-main">

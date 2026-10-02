@@ -1,4 +1,9 @@
 <?php
+/*
+ * Account preferences form for language, theme and notification categories.
+ * index.php persists submitted choices and reloads the page with a saved/error result flag.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;

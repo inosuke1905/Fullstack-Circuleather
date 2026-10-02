@@ -1,3 +1,8 @@
+-- Upgrade for databases created before administrator/worker roles existed.
+-- Preserves existing accounts and adds role/active defaults.
+-- The final example shows how to promote a trusted account; it is not executed automatically.
+
+
 USE circuleather;
 
 ALTER TABLE users

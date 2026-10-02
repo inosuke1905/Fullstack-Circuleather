@@ -1,3 +1,8 @@
+-- Creates the user table and adds preference columns when upgrading an existing database.
+-- Passwords are stored as hashes; role and active status control application access.
+-- Run schema files explicitly during database setup, not during ordinary page requests.
+
+
 USE circuleather;
 
 CREATE TABLE IF NOT EXISTS users (

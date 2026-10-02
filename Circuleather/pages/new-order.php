@@ -1,4 +1,10 @@
 <?php
+/*
+ * Order creation form with customer details and one or more material lines.
+ * Only in-stock records of the chosen order type are offered in the material dropdown.
+ * Data attributes supply SKU matching and browser estimates; the server recalculates on save.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -27,6 +33,7 @@ try {
     $batchLoadError = t('Materialen konden niet worden geladen.', 'Materials could not be loaded.');
 }
 
+// Escape option labels and expose raw values as data attributes for import matching and totals.
 $batchOptions = '<option value="">' . ($isPieceOrder ? t('Selecteer een stuk leer', 'Select a leather piece') : t('Selecteer een batch', 'Select a batch')) . '</option>';
 foreach ($availableBatches as $availableBatch) {
     $batchLabel = ($availableBatch['sku'] ?? ('#' . $availableBatch['id'])) . ' · '
@@ -35,6 +42,7 @@ foreach ($availableBatches as $availableBatch) {
         $batchLabel .= ' · ' . $availableBatch['color'];
     }
     $batchOptions .= '<option value="' . (int) $availableBatch['id'] . '"'
+        . ' data-sku="' . escape($availableBatch['sku'] ?? '') . '"'
         . ' data-unit="' . escape($availableBatch['unit']) . '"'
         . ' data-thickness="' . escape($availableBatch['thickness'] ?? '') . '"'
         . ' data-stock="' . escape((string) $availableBatch['stock']) . '"'
@@ -59,6 +67,34 @@ foreach ($availableBatches as $availableBatch) {
     <?php elseif ($availableBatches === []): ?>
         <p class="form-error" role="alert"><?= $isPieceOrder ? t('Er zijn geen losse stukken leer beschikbaar om te bestellen.', 'There are no individual leather pieces available to order.') : t('Er zijn geen batches beschikbaar om te bestellen.', 'There are no batches available to order.') ?> <a href="?page=inventory&amp;view=<?= $isPieceOrder ? 'pieces' : 'batches' ?>"><?= t('Bekijk de voorraad.', 'View inventory.') ?></a></p>
     <?php endif; ?>
+
+    <section class="excel-import-panel" data-excel-import="order" aria-labelledby="order-import-title">
+        <div class="excel-import-heading">
+            <div>
+                <p class="eyebrow"><?= t('Gegevens overnemen', 'Import data') ?></p>
+                <h2 id="order-import-title"><?= t('Importeren vanuit Excel', 'Import from Excel') ?></h2>
+                <p><?= t('Kies een bestand en selecteer de orderrij. Na import kun je extra orderregels toevoegen.', 'Choose a file and select the order row. You can add more order items afterward.') ?></p>
+            </div>
+            <div class="excel-import-actions">
+                <a class="excel-import-template" href="#" download="circuleather-order-template.csv" data-import-template><?= t('Sjabloon downloaden', 'Download template') ?></a>
+                <label class="button button-secondary" for="order-import-file"><?= t('Excelbestand kiezen', 'Choose Excel file') ?></label>
+                <input id="order-import-file" class="excel-import-file" type="file" accept=".xlsx,.xls,.csv" data-import-file>
+            </div>
+        </div>
+        <div class="excel-import-workspace" data-import-workspace hidden>
+            <div class="excel-import-row-select">
+                <label for="order-import-row"><?= t('Rij om over te nemen', 'Row to import') ?></label>
+                <select id="order-import-row" data-import-row></select>
+            </div>
+            <details class="excel-import-mapping" open>
+                <summary><?= t('Kolommen controleren en koppelen', 'Review and match columns') ?></summary>
+                <div class="excel-import-fields" data-import-fields></div>
+            </details>
+            <dl class="excel-import-preview" data-import-preview></dl>
+            <button class="button button-secondary" type="button" data-import-apply><?= t('Gegevens naar formulier overnemen', 'Fill form with imported data') ?></button>
+        </div>
+        <p class="excel-import-status" data-import-status role="status" aria-live="polite"><?= t('Excelbestanden worden lokaal in je browser gelezen.', 'Excel files are read locally in your browser.') ?></p>
+    </section>
 
     <form class="order-form" action="?page=new-order&amp;type=<?= escape($orderType) ?>" method="post">
         <input type="hidden" name="csrf_token" value="<?= escape($_SESSION['csrf_token']) ?>">

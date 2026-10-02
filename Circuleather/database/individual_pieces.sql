@@ -1,3 +1,8 @@
+-- One-time migration separating individual leather pieces from kilogram batches.
+-- Moves existing piece records and updates order references while preserving their IDs.
+-- Do not rerun this historical migration on a database that already has separate piece storage.
+
+
 USE circuleather;
 
 -- One-time migration from shared inventory to separate physical tables.

@@ -1,4 +1,10 @@
 <?php
+/*
+ * Connects the order detail form to the transaction logic in lib/order-editing.php.
+ * Callbacks record stock alerts and meaningful before/after changes.
+ * Validation errors are returned to the template; successful actions redirect to avoid resubmission.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
@@ -19,6 +25,7 @@ try {
     $findOrderNumber->bind_param('i', $orderDetailId);
     $findOrderNumber->execute();
     $orderNumber = (string) ($findOrderNumber->get_result()->fetch_assoc()['order_number'] ?? ('#' . $orderDetailId));
+    // The library calls these hooks within its transaction; the action supplies notification behavior.
     $stockChanged = static function (string $type, int $inventoryId, array $inventory, string $newStock) use ($mysqli, $actorName): void {
         createLowStockNotifications(
             $mysqli,

@@ -1,10 +1,16 @@
 <?php
+/*
+ * Handles login and logout after index.php validates the route.
+ * Login verifies the password hash and loads saved preferences into the session.
+ * Logout saves preferences before clearing the session; accounts are created by administrators.
+ */
 
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;
 }
 
+// Reject submissions from a different session before checking credentials or logging out.
 $postedToken = $_POST['csrf_token'] ?? '';
 if (!is_string($postedToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $postedToken)) {
     if ($requestedPage === 'logout') {
@@ -51,11 +57,6 @@ if ($requestedPage === 'logout') {
     exit;
 }
 
-if ($requestedPage === 'register') {
-    header('Location: ?page=login');
-    exit;
-}
-
 $authValue = static function (string $key): string {
     $value = $_POST[$key] ?? '';
     return is_string($value) ? trim($value) : '';
@@ -87,6 +88,7 @@ if ($requestedPage === 'login') {
             return;
         }
 
+        // Rotate the session ID after login and replace the form token for the authenticated session.
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int) $user['id'];
         $_SESSION['full_name'] = $user['full_name'];

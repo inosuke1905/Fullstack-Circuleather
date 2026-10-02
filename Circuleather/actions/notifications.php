@@ -1,4 +1,9 @@
 <?php
+/*
+ * Authenticated JSON endpoint used by notifications.js to poll and mark alerts as read.
+ * A feed transaction marks new alerts as delivered so concurrent polls do not repeat their toasts.
+ * Every query is scoped to the current recipient; write requests also require the session CSRF token.
+ */
 
 declare(strict_types=1);
 
@@ -28,6 +33,7 @@ try {
     }
     $_SESSION['role'] = $currentAccount['role'];
 
+    // Lock pending rows and mark delivery atomically so another tab does not repeat the same toast.
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'feed') {
         $mysqli->begin_transaction();
         if ($currentAccount['role'] !== 'admin') {
@@ -97,6 +103,7 @@ try {
         $respond(403, ['error' => 'invalid_token']);
     }
 
+    // Delivery means a toast was sent; read status is changed only by an explicit user action.
     if ($_POST['action'] === 'read_all') {
         $markAllRead = $mysqli->prepare(
             'UPDATE notifications SET read_at = CURRENT_TIMESTAMP WHERE recipient_user_id = ? AND read_at IS NULL'

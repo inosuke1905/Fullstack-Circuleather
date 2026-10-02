@@ -1,0 +1,7 @@
+# Keep local credentials, database backups and laptop uploads out of the image.
+.git
+.env
+.env.*
+backups
+Circuleather/uploads
+Circuleather/tests

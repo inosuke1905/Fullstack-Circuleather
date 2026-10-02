@@ -1,4 +1,9 @@
 <?php
+/*
+ * Read-only account summary using identity values refreshed by index.php.
+ * Shows the signed-in user's name, email and translated role.
+ */
+
 if (!defined('CIRCULEATHER_APP')) {
     http_response_code(404);
     exit;

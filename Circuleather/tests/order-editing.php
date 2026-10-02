@@ -1,4 +1,10 @@
 <?php
+/*
+ * CLI integration checks for reservation changes, revision conflicts, validation and rounding.
+ * Uses fixed fixtures and database-state hashes to verify rejected edits leave no changes.
+ * The isolated DB_NAME guard is essential: this test deletes and recreates its own fixture records.
+ */
+
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli' || getenv('DB_NAME') !== 'circuleather_order_edit_test') {
     throw new RuntimeException('Use the disposable circuleather_order_edit_test database.');
@@ -14,6 +20,7 @@ function verify(bool $condition, string $message): void { if (!$condition) { thr
 require __DIR__ . '/../db.php';
 require __DIR__ . '/../lib/order-editing.php';
 
+// Reset only the guarded disposable database, deleting child rows before their parents.
 foreach (['order_items', 'orders', 'clients', 'batches', 'individual_pieces'] as $table) {
     $mysqli->query("DELETE FROM {$table}");
 }
@@ -39,6 +46,7 @@ $databaseState = static function () use ($mysqli): string {
     }
     return hash('sha256', json_encode($state));
 };
+// Compare full database-state fingerprints before and after each expected validation failure.
 $reject = static function (int $id, array $input, string $code) use ($mysqli, $databaseState): void {
     $before = $databaseState();
     try {
@@ -121,7 +129,8 @@ $input = $payload(202); $input['city'] = 'Updated City';
 updateOrder($mysqli, 202, $input);
 verify(orderEditState($mysqli, 202)['order']['city'] === 'Updated City', 'Customer edit failed');
 
-$_SESSION = ['csrf_token' => 'test-token'];
+// Rendered history queries expect the session context normally supplied by index.php.
+$_SESSION = ['csrf_token' => 'test-token', 'user_id' => 0];
 $orderDetailId = 202; $orderEditError = null; $orderEditConflict = false;
 $_POST = $payload(202); $_POST['csrf_token'] = 'invalid';
 $before = $databaseState();

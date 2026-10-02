@@ -1,0 +1,58 @@
+# Client installation: a PHP website and its own database on one Docker network.
+# Set passwords in .env; no existing laptop database or bind mount is used here.
+name: circuleather
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: circuleather
+      DB_USER: circuleather
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - uploads:/var/www/html/circuleather/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: circuleather
+      MARIADB_USER: circuleather
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/mysql
+      - ./Circuleather/database/install.sql:/docker-entrypoint-initdb.d/01-install.sql:ro
+    # The website waits for initialization to finish, including the initial schema.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin:5.2-apache
+    restart: unless-stopped
+    profiles: ["admin"]
+    ports:
+      # The database management screen is accessible only on the server itself.
+      - "127.0.0.1:${PHPMYADMIN_PORT:-8081}:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+# Named volumes preserve orders, accounts and photos when containers are replaced.
+volumes:
+  database:
+  uploads:
